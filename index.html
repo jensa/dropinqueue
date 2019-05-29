@@ -1,0 +1,204 @@
+
+<html>
+<body>
+  <canvas id="canvas" width="1200" height="500">
+  </canvas>
+  <script type="text/javascript">
+    window.onload = function(){
+      //feature ideas
+      // shifts/breaks for clinics
+      // matching patients/symptoms, showing it visually:
+      // patient.symptoms = [{symptom:"Chlamydia", group:"womens_health"}]
+      // clinic.capabilities = ["womens_health"]
+      // expand clinicCanHandle with these capabilities
+      // show the elapsed waiting time as gradient going from green all the way to mega-red/black
+      // "hire more doctors" feature, choose from set of X, where they have different capabilities
+      // (how to show to player which capabilities you'll need?)
+      // levels? (this level has a lot of pollen, etc.)
+      // "show a longer waiting time to patients"
+      // i.e let player figure out what to set as expected waiting time
+      // give more score for fulfilled waiting times, but increase multiplier for a shorter wait times
+      // implement money
+      // implement "satisfaction" and "quality of care"
+      
+      
+      var canvas = document.getElementById("canvas");
+      var ctx = canvas.getContext("2d");
+      let boundedRandom = (min,max) => Math.random() * (max - min) + min;
+      let randomColor = () => `rgb(${boundedRandom(0,255)},${boundedRandom(0,255)},${boundedRandom(0,255)})`
+      let patients = []
+      let clinics = [...Array(3).keys()].map(c => { return { dropin:true, color: 'blue'}})
+      let floatingTexts = []
+      
+      let queueStartPoint = {y:canvas.height/2, x:400}
+      let clinicStartX = queueStartPoint.x + 50
+      let clinicsPerRow = 4
+      let clinicHeight = 50
+      let clinicWidth = 50
+      let clinicMargin = 30
+      let patientWidth = 20
+      let patientHeight = 20
+      let patientMargin = 5
+      let moveSpeed = 0.5
+      let spawnTimer = new Date()
+      let spawnSeconds = 2
+      let textFloatSeconds = 2
+      let currentScore = 0
+      
+      var mousePosition = {x:0,y:0}
+      document.onmousemove = function(evt){
+        let rect = canvas.getBoundingClientRect();
+        mousePosition = { x: evt.clientX - rect.left, y: evt.clientY - rect.top}
+      }
+      
+      document.onmousedown = evt => {
+        let rect = canvas.getBoundingClientRect();
+        let mouseClick = { x: evt.clientX - rect.left, y: evt.clientY - rect.top}
+        let isInside = (r,click) => {
+          return click.x > r.x && click.x < r.x + r.w 
+          && click.y > r.y && click.y < r.y + r.h 
+        }
+        let clinicCanHandle = (c,p) => {
+          return !c.patient && c.dropin == p.dropin
+        }
+        if(isInside({w:50, h:50, x:0, y:0},mouseClick)) {
+          clinics.push({ dropin:true, color: 'blue'})
+        }
+        let patientBeingAssigned = patients.filter(p => p.assignmentInProgress)[0]
+        if(patientBeingAssigned) {
+          
+          let clickedClinic = clinics.filter(p => isInside({w:clinicWidth + clinicMargin, h:clinicHeight + clinicMargin, x:p.x, y:p.y},mouseClick))[0]
+          if(clickedClinic && clinicCanHandle(clickedClinic, patientBeingAssigned)) {
+            clickedClinic.color = 'red'
+            clickedClinic.patient = patientBeingAssigned
+            patientBeingAssigned.treatmentStartTime = new Date()
+            //TODO more "real" (or fun?) distribution of treatment times
+            patientBeingAssigned.secondsToTreat = boundedRandom(5,10)
+            patientBeingAssigned.x = clickedClinic.x + (clinicWidth/2) - (patientWidth/2)
+            patientBeingAssigned.y = clickedClinic.y + (clinicHeight/2) - (patientHeight/2)
+            patientBeingAssigned.assignmentInProgress = false
+            
+            floatingTexts.push({startTime:new Date(), x:mousePosition.x, y:mousePosition.y, text:'Assigned!💥'})
+            let actualWaitingTime = new Date() - patientBeingAssigned.enteredQueueAt
+            let diffFromExpected = patientBeingAssigned.expectedWaitingTime - actualWaitingTime
+            currentScore += Math.floor(actualWaitingTime/1000)
+          }
+          else if(!clickedClinic) {
+            patientBeingAssigned.assignmentInProgress = false
+          }
+        }
+        
+        let clickedPatient = patients.filter(p => isInside({w:patientWidth, h:patientHeight, x:p.x, y:p.y},mouseClick) && p !== patientBeingAssigned && !p.treatmentStartTime && !p.movingToQueue)[0]
+        //patients.forEach(p => p.assignmentInProgress = false)
+        if(clickedPatient) {
+          clickedPatient.movingToQueue = false
+          clickedPatient.assignmentInProgress = true
+          clickedPatient.inQueue = false
+        }
+      }
+      
+      //logic update
+      setInterval(function(){
+        let spawnNewPatient = (new Date() - spawnTimer )/1000 > spawnSeconds
+        let queuePatients = patients.filter(p => p.inQueue && !p.assignmentInProgress)
+        let lastInQueuePatient = queuePatients[queuePatients.length -1]
+        let queueEndPoint = lastInQueuePatient ? {x: lastInQueuePatient.x - patientWidth - patientMargin, y: lastInQueuePatient.y} : queueStartPoint
+        if(spawnNewPatient) {
+          spawnTimer = new Date()
+          randomStartPoint = {x:20, y: boundedRandom(queueStartPoint.y-200, queueStartPoint.y-100)}
+          patients.push({movingToQueue: true, color:randomColor(), dropin:true, inQueue:false, name:'A' + patients.length, x:randomStartPoint.x, y:randomStartPoint.y})
+        }
+        
+        let patientBeingAssigned = patients.filter(p => p.assignmentInProgress)[0]
+        if(patientBeingAssigned) {
+          patientBeingAssigned.x = mousePosition.x - patientWidth/2
+          patientBeingAssigned.y = mousePosition.y - patientHeight/2
+        }
+        
+        let movingToQueuePatients = patients.filter(p => !p.inQueue && p.movingToQueue && !p.assignmentInProgress)
+        movingToQueuePatients.forEach(patient => {
+          patient.x = patient.x + moveSpeed > queueEndPoint.x ? queueEndPoint.x : patient.x + moveSpeed
+          patient.y = patient.y + moveSpeed > queueEndPoint.y ? queueEndPoint.y : patient.y + moveSpeed
+          if(patient.x == queueEndPoint.x && patient.y == queueEndPoint.y) {
+            patient.inQueue = true
+            patient.movingToQueue = false
+            patient.enteredQueueAt = new Date()
+          }
+        });
+        
+        queuePatients.forEach((patient, index) => {
+          let queuingStartPosition = index + 1
+          patient.x = queueStartPoint.x - queuingStartPosition*patientWidth - queuingStartPosition*patientMargin
+          patient.y = queueStartPoint.y
+        });
+        
+        let clinicRows = Math.ceil(clinics.length / clinicsPerRow)
+        let clinicAreaHeight = clinicRows * (clinicHeight + clinicMargin)
+        let clinicStartY = queueStartPoint.y - (clinicAreaHeight/2) + (clinicHeight/2) - (patientHeight/2) - 3
+        clinics.forEach((clinic, index) => {
+          let rowNumber = Math.floor(index/clinicsPerRow)
+          let indexInRow = index % clinicsPerRow
+          clinic.y = clinicStartY + rowNumber * clinicHeight + rowNumber*clinicMargin
+          clinic.x = clinicStartX + indexInRow*clinicWidth + indexInRow*clinicMargin
+          if(clinic.patient) {
+            clinic.patient.x = clinic.x + (clinicWidth/2) - (patientWidth/2)
+            clinic.patient.y = clinic.y + (clinicHeight/2) - (patientHeight/2)
+          }
+        })
+        
+        
+        clinics.filter(c => c.patient).forEach(c => {
+          let treatmentTime = (new Date() - c.patient.treatmentStartTime)/1000
+          if(c.patient.secondsToTreat < treatmentTime) {
+            patients = patients.filter(p => p !== c.patient)
+            c.patient = null
+            c.color = 'blue'
+          }
+        });
+        
+        floatingTexts = floatingTexts.filter(f => new Date() - f.startTime < (textFloatSeconds * 1000))
+        floatingTexts.forEach(text => {
+          text.x += moveSpeed
+          text.y -= moveSpeed
+        });
+        
+      }, 1000/600);
+      //GFX update
+      setInterval(function(){
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        clinics.forEach(clinic => {
+          ctx.strokeStyle = clinic.color;
+          ctx.lineWidth = 5;
+          ctx.strokeRect(clinic.x-5, clinic.y-5, clinicWidth + 10 , clinicHeight + 10);
+          if(clinic.patient) {
+            let treatmentTimeSecondsString = '' + (new Date() - clinic.patient.treatmentStartTime)/1000
+            let timeParts = treatmentTimeSecondsString.split('.')
+            let time1 = timeParts[0]
+            let time2 = timeParts[1] ? timeParts[1].substr(0,2) : '00' 
+            ctx.font = '10px serif';
+            ctx.fillStyle = 'black'
+            ctx.fillText(`${time1}:${time2}`, clinic.x, clinic.y + clinicHeight);
+          }
+        });
+        
+        patients.forEach(patient => {
+          ctx.fillStyle = patient.color;
+          ctx.fillRect(patient.x, patient.y, patientWidth, patientHeight);
+        });
+        
+        floatingTexts.forEach(text => {
+          ctx.font = '26px serif';
+          ctx.fillStyle = 'black'
+          ctx.fillText(text.text, text.x, text.y);
+        });
+        
+        ctx.font = '40px serif';
+        ctx.fillStyle = 'black'
+        ctx.fillText(`Score: ${currentScore}`, 10, 50);
+        
+      }, 1000/60);
+
+    }
+  </script>
+</body>
+</html>

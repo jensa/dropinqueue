@@ -5,10 +5,24 @@
   </canvas>
   <script type="text/javascript">
     window.onload = function(){
+      let shuffle = a => {
+        var c = a.length, t, r;
+        while (0 !== c) {
+          r = Math.floor(Math.random() * c);
+          c -= 1;
+          t = a[c];
+          a[c] = a[r];
+          a[r] = t;
+        }
+        return a;
+      }
+
       //feature ideas
+      // waiting time is #1 score (maybe money will be a secondary stat)
+      // matching wrong symptom to wrong specialty = longer treatment time (i.e longer wait times)
       // shifts/breaks for clinics
+
       // matching patients/symptoms, showing it visually:
-      // patient.symptoms = [{symptom:"Chlamydia", group:"womens_health"}]
       // clinic.capabilities = ["womens_health"]
       // expand clinicCanHandle with these capabilities
       // show the elapsed waiting time as gradient going from green all the way to mega-red/black
@@ -20,121 +34,229 @@
       // give more score for fulfilled waiting times, but increase multiplier for a shorter wait times
       // implement money
       // implement "satisfaction" and "quality of care"
-      
-      
+      // patient state enum
+
+
+      //document objects
       var canvas = document.getElementById("canvas");
       var ctx = canvas.getContext("2d");
-      let boundedRandom = (min,max) => Math.random() * (max - min) + min;
-      let randomColor = () => `rgb(${boundedRandom(0,255)},${boundedRandom(0,255)},${boundedRandom(0,255)})`
-      let patients = []
-      let clinics = [...Array(3).keys()].map(c => { return { dropin:true, color: 'blue'}})
-      let floatingTexts = []
-      
+      //game combinations
+      const PATIENT_FACES= ["👨","👩","👨🏻","👨🏼","👨🏽","👨🏾","👨🏿","👩🏻","👩🏼","👩🏽","👩🏾","👩🏿"]
+      const SYMPTOMS = {
+        BUTT: { symbol: "🍑", name:"BUTT"},
+        INTESTINAL_GAS: { symbol: "💨", name:"INTESTINAL_GAS"},
+        DIGESTION: { symbol: "🍔", name:"DIGESTION"},
+        WOMEN: { symbol: "♀️", name:"WOMEN"},
+        PREGNANT: { symbol: "👶", name:"PREGNANT"},
+        VAGINA_PROBLEM: { symbol: "🌮", name:"VAGINA_PROBLEM"},
+        BREAST_PROBLEM: { symbol: "🍒", name:"BREAST_PROBLEM"},
+        HERPES: { symbol: "💋", name:"HERPES"},
+        MEN: { symbol: "♂️", name:"MEN"},
+        PENIS_PROBLEM: { symbol: "🍆", name:"PENIS_PROBLEM"},
+        DRUG_USE: { symbol: "💊", name:"DRUG_USE"},
+        SMOKING: { symbol: "🚬", name:"SMOKING"},
+        OBESITY: { symbol: "🍫", name:"OBESITY"},
+        ALCOHOL: { symbol: "🍺", name:"ALCOHOL"},
+        EYES: { symbol: "👀", name:"EYES"},
+        CYCLOP: { symbol: "👁️", name:"CYCLOP"},
+        TONGUE: { symbol: "👅", name:"TONGUE"},
+        EAR: { symbol: "👂", name:"EAR"},
+        NOSE: { symbol: "👃", name:"NOSE"},
+        STUFFED_NOSE: { symbol: "😤", name:"STUFFED_NOSE"},
+        SKI_INJURY: { symbol: "⛷", name:"SKI_INJURY"},
+        HEAD_INJURY: { symbol: "🤕", name:"HEAD_INJURY"},
+        BURNS: { symbol: "🔥", name:"BURNS"},
+        FREEZE: { symbol: "⛄", name:"FREEZE"},
+        INSECT_BITE: { symbol: "🕷", name:"INSECT_BITE"},
+        POISONED: { symbol: "☠", name:"POISONED"},
+        HELLA_UGLY: { symbol: "👺", name:"HELLA_UGLY"},
+        STRESS: { symbol: "⚙", name:"STRESS"},
+        STONE_FACE: { symbol: "🗿", name:"STONE_FACE"},
+        MOON_FACE: { symbol: "🌚", name:"MOON_FACE"},
+        ACNE: { symbol: "🌞", name:"ACNE"},
+        MURDER_THOUGHTS: { symbol: "🔪", name:"MURDER_THOUGHTS"},
+        OVERACHIEVER: { symbol: "🏅", name:"OVERACHIEVER"},
+        ANGER_ISSUES: { symbol: "⛈", name:"ANGER_ISSUES"},
+        PSYCHOPATH: { symbol: "🙃", name:"PSYCHOPATH"},
+        SOCIAL_ANXIETY: { symbol: "🤐", name:"SOCIAL_ANXIETY"},
+        GRIEF: { symbol: "😭", name:"GRIEF"},
+      }
+
+      const SPECIALITIES = {
+        PSYCHOLOGY: {symptoms: [SYMPTOMS.GRIEF, SYMPTOMS.SOCIAL_ANXIETY, SYMPTOMS.PSYCHOPATH, SYMPTOMS.ANGER_ISSUES, SYMPTOMS.OVERACHIEVER, SYMPTOMS.MURDER_THOUGHTS, SYMPTOMS.STRESS]},
+        GYNO: {symptoms:[SYMPTOMS.WOMEN, SYMPTOMS.PREGNANT, SYMPTOMS.VAGINA_PROBLEM, SYMPTOMS.BREAST_PROBLEM, SYMPTOMS.HERPES]},
+        MALE_GYNO: {symptoms:[SYMPTOMS.MEN, SYMPTOMS.HERPES, SYMPTOMS.PENIS_PROBLEM]},
+        GASTRO: {symptoms:[SYMPTOMS.BUTT, SYMPTOMS.INTESTINAL_GAS, SYMPTOMS.DIGESTION]},
+        GENERAL: {symptoms:[SYMPTOMS.STRESS, SYMPTOMS.INSECT_BITE, SYMPTOMS.TONGUE, SYMPTOMS.SMOKING, SYMPTOMS.STUFFED_NOSE, SYMPTOMS.HEAD_INJURY]},
+        ADDICTION: {symptoms:[SYMPTOMS.DRUG_USE, SYMPTOMS.SMOKING, SYMPTOMS.OBESITY, SYMPTOMS.ALCOHOL]},
+        THORAX: {symptoms:[SYMPTOMS.TONGUE, SYMPTOMS.EAR, SYMPTOMS.NOSE, SYMPTOMS.STUFFED_NOSE]},
+        EMERGENCY: {symptoms:[SYMPTOMS.SKI_INJURY, SYMPTOMS.HEAD_INJURY, SYMPTOMS.BURNS, SYMPTOMS.FREEZE, SYMPTOMS.INSECT_BITE, SYMPTOMS.POISONED]},
+        PLASTIC: {symptoms:[SYMPTOMS.HELLA_UGLY, SYMPTOMS.ACNE, SYMPTOMS.MOON_FACE, SYMPTOMS.STONE_FACE, SYMPTOMS.BREAST_PROBLEM]},
+        PROCTOLOGY: {symptoms:[SYMPTOMS.BUTT]},
+        EYES: {symptoms:[SYMPTOMS.CYCLOP, SYMPTOMS.EYES]}
+      }
+      let formatSymptomName = s => s.charAt(0).toUpperCase() + s.split("_").join(" ").toLowerCase().substr(1)
+      const ALL_SYMPTOMS = Object.keys(SYMPTOMS).map(k => { return {name:SYMPTOMS[k].name, symbol:SYMPTOMS[k].symbol, formattedName: formatSymptomName(SYMPTOMS[k].name)}})
+      const ALL_SPECIALITIES = Object.keys(SPECIALITIES).map(k => { return {name:k, symptoms:SPECIALITIES[k].symptoms}})
+
+      const PATIENT_STATE = {
+        MOVING_TO_QUEUE:"MOVING_TO_QUEUE",
+        IN_QUEUE:"IN_QUEUE",
+        BEING_ASSIGNED:"BEING_ASSIGNED",
+        IN_LIMBO: "IN_LIMBO",
+        IN_CLINIC:"IN_CLINIC"
+      }
+      //utilities
       let queueStartPoint = {y:canvas.height/2, x:400}
+
+      let boundedRandom = (min,max) => Math.random() * (max - min) + min;
+      let boundedRandomInt = (min,max) => Math.floor(Math.random() * (max - min) + min);
+      let randomColor = () => `rgb(${boundedRandom(0,255)},${boundedRandom(0,255)},${boundedRandom(0,255)})`
+
+      let createPatient = () => {
+        let name = patients ? patients.length : 0
+        let randomStartPoint = {x:20, y:boundedRandom(queueStartPoint.y-200, queueStartPoint.y-100)}
+        return {
+          state : PATIENT_STATE.MOVING_TO_QUEUE,
+          color:'transparent',
+          symptom: ALL_SYMPTOMS[boundedRandomInt(0,ALL_SYMPTOMS.length)],
+          symptomAnimationSize : 30,
+          symptomAnimationDirection: -1,
+          face: PATIENT_FACES[boundedRandomInt(0,PATIENT_FACES.length)],
+          name: name,
+          x:randomStartPoint.x,
+          y:randomStartPoint.y
+        }
+      }
+      let createClinic = () => {
+        let primarySymptom = ALL_SYMPTOMS[boundedRandomInt(0,ALL_SYMPTOMS.length)]
+        let secondarySymptoms = shuffle(ALL_SYMPTOMS.filter(s => s !== primarySymptom)).slice(0,3);
+        return {
+          color: 'blue',
+          primarySymptom: primarySymptom,
+          secondarySymptoms: secondarySymptoms
+        }
+      }
+      let patients = []
+      patients.push(createPatient())
+      let clinics = [...Array(3).keys()].map(c => createClinic())
+      let floatingTexts = []
+
       let clinicStartX = queueStartPoint.x + 50
       let clinicsPerRow = 4
       let clinicHeight = 50
       let clinicWidth = 50
       let clinicMargin = 30
-      let patientWidth = 20
-      let patientHeight = 20
+      let patientWidth = 30
+      let patientHeight = 30
       let patientMargin = 5
-      let moveSpeed = 0.5
+      let moveSpeed = 1
       let spawnTimer = new Date()
-      let spawnSeconds = 2
+      let spawnSeconds = 3
       let textFloatSeconds = 2
       let currentScore = 0
-      
+
       var mousePosition = {x:0,y:0}
       document.onmousemove = function(evt){
         let rect = canvas.getBoundingClientRect();
         mousePosition = { x: evt.clientX - rect.left, y: evt.clientY - rect.top}
       }
-      
+
       document.onmousedown = evt => {
         let rect = canvas.getBoundingClientRect();
         let mouseClick = { x: evt.clientX - rect.left, y: evt.clientY - rect.top}
         let isInside = (r,click) => {
-          return click.x > r.x && click.x < r.x + r.w 
-          && click.y > r.y && click.y < r.y + r.h 
+          return click.x > r.x && click.x < r.x + r.w
+          && click.y > r.y && click.y < r.y + r.h
         }
         let clinicCanHandle = (c,p) => {
-          return !c.patient && c.dropin == p.dropin
+          return !c.patient
+        }
+        let clinicTreatmentTime = (c,p) => {
+          if(c.primarySymptom.name == p.symptom.name) {
+            //specialty match
+            return 1
+          }
+          if(c.secondarySymptoms.filter(s => s.name == p.symptom.name).length > 0) {
+            //secondary specialty match
+            return 5
+          }
+          return 10
         }
         if(isInside({w:50, h:50, x:0, y:0},mouseClick)) {
-          clinics.push({ dropin:true, color: 'blue'})
+          clinics.push(createClinic())
         }
-        let patientBeingAssigned = patients.filter(p => p.assignmentInProgress)[0]
+        let patientBeingAssigned = patients.filter(p => p.state == PATIENT_STATE.BEING_ASSIGNED)[0]
         if(patientBeingAssigned) {
-          
+
           let clickedClinic = clinics.filter(p => isInside({w:clinicWidth + clinicMargin, h:clinicHeight + clinicMargin, x:p.x, y:p.y},mouseClick))[0]
           if(clickedClinic && clinicCanHandle(clickedClinic, patientBeingAssigned)) {
             clickedClinic.color = 'red'
             clickedClinic.patient = patientBeingAssigned
+            patientBeingAssigned.state = PATIENT_STATE.IN_CLINIC
             patientBeingAssigned.treatmentStartTime = new Date()
             //TODO more "real" (or fun?) distribution of treatment times
-            patientBeingAssigned.secondsToTreat = boundedRandom(5,10)
+            patientBeingAssigned.secondsToTreat = clinicTreatmentTime(clickedClinic,patientBeingAssigned)
             patientBeingAssigned.x = clickedClinic.x + (clinicWidth/2) - (patientWidth/2)
             patientBeingAssigned.y = clickedClinic.y + (clinicHeight/2) - (patientHeight/2)
-            patientBeingAssigned.assignmentInProgress = false
-            
-            floatingTexts.push({startTime:new Date(), x:mousePosition.x, y:mousePosition.y, text:'Assigned!💥'})
+
+            floatingTexts.push({startTime:new Date(), x:mousePosition.x, y:mousePosition.y, text:patientBeingAssigned.symptom.formattedName})
             let actualWaitingTime = new Date() - patientBeingAssigned.enteredQueueAt
             let diffFromExpected = patientBeingAssigned.expectedWaitingTime - actualWaitingTime
             currentScore += Math.floor(actualWaitingTime/1000)
           }
           else if(!clickedClinic) {
-            patientBeingAssigned.assignmentInProgress = false
+            patientBeingAssigned.state = PATIENT_STATE.IN_LIMBO
           }
         }
-        
-        let clickedPatient = patients.filter(p => isInside({w:patientWidth, h:patientHeight, x:p.x, y:p.y},mouseClick) && p !== patientBeingAssigned && !p.treatmentStartTime && !p.movingToQueue)[0]
-        //patients.forEach(p => p.assignmentInProgress = false)
+
+        let clickedPatient = patients.filter(p =>
+          isInside({w:patientWidth, h:patientHeight, x:p.x, y:p.y}, mouseClick)
+          && p !== patientBeingAssigned
+          && (p.state == PATIENT_STATE.IN_QUEUE || p.state == PATIENT_STATE.IN_LIMBO))[0]
         if(clickedPatient) {
-          clickedPatient.movingToQueue = false
-          clickedPatient.assignmentInProgress = true
-          clickedPatient.inQueue = false
+          clickedPatient.state = PATIENT_STATE.BEING_ASSIGNED
         }
       }
-      
+
       //logic update
       setInterval(function(){
         let spawnNewPatient = (new Date() - spawnTimer )/1000 > spawnSeconds
-        let queuePatients = patients.filter(p => p.inQueue && !p.assignmentInProgress)
+        let queuePatients = patients.filter(p => p.state == PATIENT_STATE.IN_QUEUE)
         let lastInQueuePatient = queuePatients[queuePatients.length -1]
-        let queueEndPoint = lastInQueuePatient ? {x: lastInQueuePatient.x - patientWidth - patientMargin, y: lastInQueuePatient.y} : queueStartPoint
+        let queueEndPoint = lastInQueuePatient ? {x: lastInQueuePatient.x, y: lastInQueuePatient.y} : queueStartPoint
         if(spawnNewPatient) {
           spawnTimer = new Date()
-          randomStartPoint = {x:20, y: boundedRandom(queueStartPoint.y-200, queueStartPoint.y-100)}
-          patients.push({movingToQueue: true, color:randomColor(), dropin:true, inQueue:false, name:'A' + patients.length, x:randomStartPoint.x, y:randomStartPoint.y})
+          patients.push(createPatient())
         }
-        
-        let patientBeingAssigned = patients.filter(p => p.assignmentInProgress)[0]
+
+        let patientBeingAssigned = patients.filter(p => p.state == PATIENT_STATE.BEING_ASSIGNED)[0]
         if(patientBeingAssigned) {
           patientBeingAssigned.x = mousePosition.x - patientWidth/2
           patientBeingAssigned.y = mousePosition.y - patientHeight/2
         }
-        
-        let movingToQueuePatients = patients.filter(p => !p.inQueue && p.movingToQueue && !p.assignmentInProgress)
+
+        let movingToQueuePatients = patients.filter(p => p.state == PATIENT_STATE.MOVING_TO_QUEUE)
         movingToQueuePatients.forEach(patient => {
-          patient.x = patient.x + moveSpeed > queueEndPoint.x ? queueEndPoint.x : patient.x + moveSpeed
+          patient.x = patient.x + patientWidth + patientMargin + moveSpeed > queueEndPoint.x ? queueEndPoint.x : patient.x + moveSpeed
           patient.y = patient.y + moveSpeed > queueEndPoint.y ? queueEndPoint.y : patient.y + moveSpeed
           if(patient.x == queueEndPoint.x && patient.y == queueEndPoint.y) {
-            patient.inQueue = true
-            patient.movingToQueue = false
+            patient.state = PATIENT_STATE.IN_QUEUE
             patient.enteredQueueAt = new Date()
           }
         });
-        
+
         queuePatients.forEach((patient, index) => {
           let queuingStartPosition = index + 1
           patient.x = queueStartPoint.x - queuingStartPosition*patientWidth - queuingStartPosition*patientMargin
           patient.y = queueStartPoint.y
+          let secondsInQueue = (new Date() - patient.enteredQueueAt)/1000
+          patient.color = `rgb(${100 + (secondsInQueue*5)},${255 - (secondsInQueue*20)},${0})`
         });
-        
+
         let clinicRows = Math.ceil(clinics.length / clinicsPerRow)
         let clinicAreaHeight = clinicRows * (clinicHeight + clinicMargin)
-        let clinicStartY = queueStartPoint.y - (clinicAreaHeight/2) + (clinicHeight/2) - (patientHeight/2) - 3
+        let clinicStartY = queueStartPoint.y - (clinicAreaHeight/2) + (clinicHeight/2)
         clinics.forEach((clinic, index) => {
           let rowNumber = Math.floor(index/clinicsPerRow)
           let indexInRow = index % clinicsPerRow
@@ -145,8 +267,8 @@
             clinic.patient.y = clinic.y + (clinicHeight/2) - (patientHeight/2)
           }
         })
-        
-        
+
+
         clinics.filter(c => c.patient).forEach(c => {
           let treatmentTime = (new Date() - c.patient.treatmentStartTime)/1000
           if(c.patient.secondsToTreat < treatmentTime) {
@@ -155,13 +277,13 @@
             c.color = 'blue'
           }
         });
-        
+
         floatingTexts = floatingTexts.filter(f => new Date() - f.startTime < (textFloatSeconds * 1000))
         floatingTexts.forEach(text => {
           text.x += moveSpeed
           text.y -= moveSpeed
         });
-        
+
       }, 1000/600);
       //GFX update
       setInterval(function(){
@@ -174,28 +296,48 @@
             let treatmentTimeSecondsString = '' + (new Date() - clinic.patient.treatmentStartTime)/1000
             let timeParts = treatmentTimeSecondsString.split('.')
             let time1 = timeParts[0]
-            let time2 = timeParts[1] ? timeParts[1].substr(0,2) : '00' 
+            let time2 = timeParts[1] ? timeParts[1].substr(0,2) : '00'
             ctx.font = '10px serif';
             ctx.fillStyle = 'black'
             ctx.fillText(`${time1}:${time2}`, clinic.x, clinic.y + clinicHeight);
           }
+
+          ctx.font = '10px serif';
+          let specialtySymbols = clinic.secondarySymptoms.slice().concat([clinic.primarySymptom]).map(s => s.symbol).join(",")
+          ctx.fillText(specialtySymbols, clinic.x-5, clinic.y -10 );
         });
-        
-        patients.forEach(patient => {
+
+        patients.slice().sort((a,b) =>{
+          return a.state == PATIENT_STATE.BEING_ASSIGNED ? 1 : (b.state == PATIENT_STATE.BEING_ASSIGNED ? -1 : 0)
+        }).forEach(patient => {
+          //draw face and box
           ctx.fillStyle = patient.color;
           ctx.fillRect(patient.x, patient.y, patientWidth, patientHeight);
+          ctx.font = `${patientWidth}px serif`;
+          ctx.fillStyle = 'black';
+          ctx.fillText(patient.face, patient.x, patient.y+patientHeight-2);
+
+          //draw symptom symbol
+          patient.symptomAnimationSize += 0.1 * patient.symptomAnimationDirection
+          ctx.font = `${patient.symptomAnimationSize}px serif`;
+          if(patient.symptomAnimationSize > 20) {
+            patient.symptomAnimationDirection = -1
+          } else if(patient.symptomAnimationSize < 10) {
+            patient.symptomAnimationDirection = 1
+          }
+          ctx.fillText(patient.symptom.symbol, patient.x + 20 - patient.symptomAnimationSize, patient.y - 8);
         });
-        
+
         floatingTexts.forEach(text => {
           ctx.font = '26px serif';
           ctx.fillStyle = 'black'
           ctx.fillText(text.text, text.x, text.y);
         });
-        
+
         ctx.font = '40px serif';
         ctx.fillStyle = 'black'
         ctx.fillText(`Score: ${currentScore}`, 10, 50);
-        
+
       }, 1000/60);
 
     }

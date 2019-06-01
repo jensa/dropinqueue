@@ -19,22 +19,12 @@
 
       //feature ideas
       // waiting time is #1 score (maybe money will be a secondary stat)
-      // matching wrong symptom to wrong specialty = longer treatment time (i.e longer wait times)
       // shifts/breaks for clinics
 
-      // matching patients/symptoms, showing it visually:
-      // clinic.capabilities = ["womens_health"]
-      // expand clinicCanHandle with these capabilities
-      // show the elapsed waiting time as gradient going from green all the way to mega-red/black
       // "hire more doctors" feature, choose from set of X, where they have different capabilities
       // (how to show to player which capabilities you'll need?)
       // levels? (this level has a lot of pollen, etc.)
-      // "show a longer waiting time to patients"
-      // i.e let player figure out what to set as expected waiting time
-      // give more score for fulfilled waiting times, but increase multiplier for a shorter wait times
       // implement money
-      // implement "satisfaction" and "quality of care"
-      // patient state enum
 
 
       //document objects
@@ -155,6 +145,8 @@
       let spawnSeconds = 3
       let textFloatSeconds = 2
       let currentScore = 0
+      let gameOver = false
+      let patientsTreated = []
 
       var mousePosition = {x:0,y:0}
       document.onmousemove = function(evt){
@@ -201,9 +193,11 @@
             patientBeingAssigned.y = clickedClinic.y + (clinicHeight/2) - (patientHeight/2)
 
             floatingTexts.push({startTime:new Date(), x:mousePosition.x, y:mousePosition.y, text:patientBeingAssigned.symptom.formattedName})
-            let actualWaitingTime = new Date() - patientBeingAssigned.enteredQueueAt
-            let diffFromExpected = patientBeingAssigned.expectedWaitingTime - actualWaitingTime
-            currentScore += Math.floor(actualWaitingTime/1000)
+            patientBeingAssigned.actualWaitingTime = Math.floor((new Date() - patientBeingAssigned.enteredQueueAt)/1000)
+            currentScore += patientBeingAssigned.actualWaitingTime
+            if(currentScore > 100) {
+              gameOver = true
+            }
           }
           else if(!clickedClinic) {
             patientBeingAssigned.state = PATIENT_STATE.IN_LIMBO
@@ -272,6 +266,8 @@
         clinics.filter(c => c.patient).forEach(c => {
           let treatmentTime = (new Date() - c.patient.treatmentStartTime)/1000
           if(c.patient.secondsToTreat < treatmentTime) {
+            //finish treatment
+            patientsTreated.push({face: c.patient.face, symptom:c.patient.symptom, waitingTime: c.patient.actualWaitingTime})
             patients = patients.filter(p => p !== c.patient)
             c.patient = null
             c.color = 'blue'
@@ -288,6 +284,17 @@
       //GFX update
       setInterval(function(){
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if(gameOver) {
+          ctx.font = '50px serif';
+          ctx.fillStyle = 'black'
+          ctx.fillText(`GAME OVER`, 100, 100);
+          ctx.font = '20px serif';
+          ctx.fillText(`Treated patients:`, 100, 250);
+          ctx.font = '10px serif';
+          let treatedPatientsReel = patientsTreated.map(p => `${p.face}: ${p.symptom.symbol} ${p.waitingTime}s`).join(" ")
+          ctx.fillText(treatedPatientsReel, 100, 300);
+          return
+        }
         clinics.forEach(clinic => {
           ctx.strokeStyle = clinic.color;
           ctx.lineWidth = 5;
@@ -336,7 +343,7 @@
 
         ctx.font = '40px serif';
         ctx.fillStyle = 'black'
-        ctx.fillText(`Score: ${currentScore}`, 10, 50);
+        ctx.fillText(`Total waiting time: ${currentScore}`, 10, 50);
 
       }, 1000/60);
 

@@ -267,7 +267,7 @@
           let treatmentTime = (new Date() - c.patient.treatmentStartTime)/1000
           if(c.patient.secondsToTreat < treatmentTime) {
             //finish treatment
-            patientsTreated.push({face: c.patient.face, symptom:c.patient.symptom, waitingTime: c.patient.actualWaitingTime})
+            patientsTreated.push({face: c.patient.face, symptom:c.patient.symptom, waitingTime: c.patient.actualWaitingTime, finishedTreatment:new Date()})
             patients = patients.filter(p => p !== c.patient)
             c.patient = null
             c.color = 'blue'
@@ -289,10 +289,44 @@
           ctx.fillStyle = 'black'
           ctx.fillText(`GAME OVER`, 100, 100);
           ctx.font = '20px serif';
-          ctx.fillText(`Treated patients:`, 100, 250);
+          ctx.fillText(`Treated patients:`, 100, 150);
           ctx.font = '10px serif';
-          let treatedPatientsReel = patientsTreated.map(p => `${p.face}: ${p.symptom.symbol} ${p.waitingTime}s`).join(" ")
-          ctx.fillText(treatedPatientsReel, 100, 300);
+          let firstTreatmentFinishedTime = patientsTreated[0].finishedTreatment
+          let waitingGraph = patientsTreated.map(p => {return {x:(p.finishedTreatment-firstTreatmentFinishedTime)/1000, y:p.waitingTime, f:p.face, s:p.symptom.symbol}})
+          //draw graph
+          let secondWidth = 10
+          let waitingTimeHeight = 10
+          let originX = 100
+          let originY = 500
+          let lastX = waitingGraph[waitingGraph.length -1].x * secondWidth
+          let highestY = waitingGraph.reduce((a,g) => a = g.y > a ? g.y : a, 0)
+
+          ctx.strokeStyle = "gray";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(originX, originY);
+          ctx.lineTo(originX, originY - (highestY*waitingTimeHeight));
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(originX, originY);
+          ctx.lineTo(originX + lastX, originY);
+          ctx.stroke();
+
+          ctx.strokeStyle = "black";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(originX, originY);
+          let faces = []
+          waitingGraph.forEach(g => {
+            //ctx.moveTo(originX+ (g.x * secondWidth), g.y); //origin
+            faces.push({s:g.s, f:g.f, x:originX+ (g.x * secondWidth) - 5, y:originY - (g.y*waitingTimeHeight)})
+            ctx.lineTo(originX+ (g.x * secondWidth), originY - (g.y*waitingTimeHeight));
+          });
+          ctx.stroke();
+          faces.forEach(f => {
+            ctx.fillText(f.s, f.x, f.y - 20);
+            ctx.fillText(f.f, f.x, f.y - 5);
+          })
           return
         }
         clinics.forEach(clinic => {
